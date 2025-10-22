@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">mackay</string>
+    <string name="select_exercise">選擇運動</string>
+    <string name="high_kick_side">高抬腳(側面)</string>
+    <string name="side_step">左右跨步</string>
+    <string name="toe_to_heel">腳尖對齊腳跟</string>
+</resources>
