@@ -39,9 +39,11 @@ class PoseOverlayView @JvmOverloads constructor(
     
     // 關鍵點平滑處理
     private val landmarkSmoothingSize = 3
+    private val leftShoulderHistory = mutableListOf<Pair<Float, Float>>()
     private val leftHipHistory = mutableListOf<Pair<Float, Float>>()
     private val leftKneeHistory = mutableListOf<Pair<Float, Float>>()
     private val leftAnkleHistory = mutableListOf<Pair<Float, Float>>()
+    private val rightShoulderHistory = mutableListOf<Pair<Float, Float>>()
     private val rightHipHistory = mutableListOf<Pair<Float, Float>>()
     private val rightKneeHistory = mutableListOf<Pair<Float, Float>>()
     private val rightAnkleHistory = mutableListOf<Pair<Float, Float>>()
@@ -57,7 +59,7 @@ class PoseOverlayView @JvmOverloads constructor(
     private var currentMovementStatus: HeelMovementDetector.MovementStatus? = null
     
     // 運動類型
-    private var exerciseType: String = "高抬腳(側面)"
+    private var exerciseType: String = ""
 
     private var scaleFactor: Float = 1f
     private var imageWidth: Int = 1
@@ -392,7 +394,129 @@ class PoseOverlayView @JvmOverloads constructor(
                 return
             }
             
-            // 獲取正確的關鍵點索引（處理鏡像情況）- 修改為髖-膝-踝角度
+            // 根據運動類型選擇不同的角度計算方式
+            when (exerciseType) {
+                "高抬腳(側面)" -> {
+                    // 高抬腳使用肩-髖-膝角度
+                    calculateShoulderHipKneeAngles(landmarks)
+                }
+                "左右跨步" -> {
+                    // 左右跨步使用髖-膝-踝角度
+                    calculateHipKneeAnkleAngles(landmarks)
+                }
+                else -> {
+                    // 默認使用髖-膝-踝角度
+                    calculateHipKneeAnkleAngles(landmarks)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("PoseOverlayView", "計算角度時發生錯誤: ${e.message}")
+            leftAngleValid = false
+            rightAngleValid = false
+        }
+    }
+    
+    /**
+     * 計算肩-髖-膝角度（用於高抬腳）
+     */
+    private fun calculateShoulderHipKneeAngles(landmarks: List<com.google.mediapipe.tasks.components.containers.NormalizedLandmark>) {
+        try {
+            // 獲取肩-髖-膝關鍵點索引
+            val leftShoulderIndex = getCorrectLandmarkIndex(11)
+            val leftHipIndex = getCorrectLandmarkIndex(23)
+            val leftKneeIndex = getCorrectLandmarkIndex(25)
+            val rightShoulderIndex = getCorrectLandmarkIndex(12)
+            val rightHipIndex = getCorrectLandmarkIndex(24)
+            val rightKneeIndex = getCorrectLandmarkIndex(26)
+            
+            // 左腿肩-髖-膝角度計算
+            val leftShoulder = landmarks[leftShoulderIndex]
+            val leftHip = landmarks[leftHipIndex]
+            val leftKnee = landmarks[leftKneeIndex]
+            
+            // 檢查左腿關鍵點是否都在螢幕上
+            val leftShoulderInScreen = isLandmarkInScreen(leftShoulder)
+            val leftHipInScreen = isLandmarkInScreen(leftHip)
+            val leftKneeInScreen = isLandmarkInScreen(leftKnee)
+            
+            if (leftShoulderInScreen && leftHipInScreen && leftKneeInScreen &&
+                AngleCalculator.isLandmarkValid(leftShoulder) && 
+                AngleCalculator.isLandmarkValid(leftHip) && 
+                AngleCalculator.isLandmarkValid(leftKnee)) {
+                
+                // 平滑關鍵點坐標
+                val smoothLeftShoulder = smoothLandmark(leftShoulderHistory, leftShoulder.x(), leftShoulder.y())
+                val smoothLeftHip = smoothLandmark(leftHipHistory, leftHip.x(), leftHip.y())
+                val smoothLeftKnee = smoothLandmark(leftKneeHistory, leftKnee.x(), leftKnee.y())
+                
+                // 使用平滑後的坐標計算肩-髖-膝角度
+                val newLeftAngle = calculateAngleFromCoordinates(
+                    smoothLeftShoulder.first, smoothLeftShoulder.second,
+                    smoothLeftHip.first, smoothLeftHip.second,
+                    smoothLeftKnee.first, smoothLeftKnee.second
+                )
+                leftAngle = newLeftAngle
+                leftAngleValid = true
+                
+                // 更新左腳角度歷史
+                updateAngleHistory(leftAngleHistory, newLeftAngle)
+            } else {
+                leftAngleValid = false
+                android.util.Log.d("PoseOverlayView", "左腿肩-髖-膝關鍵點不在螢幕上或無效")
+            }
+            
+            // 右腿肩-髖-膝角度計算
+            val rightShoulder = landmarks[rightShoulderIndex]
+            val rightHip = landmarks[rightHipIndex]
+            val rightKnee = landmarks[rightKneeIndex]
+            
+            // 檢查右腿關鍵點是否都在螢幕上
+            val rightShoulderInScreen = isLandmarkInScreen(rightShoulder)
+            val rightHipInScreen = isLandmarkInScreen(rightHip)
+            val rightKneeInScreen = isLandmarkInScreen(rightKnee)
+            
+            if (rightShoulderInScreen && rightHipInScreen && rightKneeInScreen &&
+                AngleCalculator.isLandmarkValid(rightShoulder) && 
+                AngleCalculator.isLandmarkValid(rightHip) && 
+                AngleCalculator.isLandmarkValid(rightKnee)) {
+                
+                // 平滑關鍵點坐標
+                val smoothRightShoulder = smoothLandmark(rightShoulderHistory, rightShoulder.x(), rightShoulder.y())
+                val smoothRightHip = smoothLandmark(rightHipHistory, rightHip.x(), rightHip.y())
+                val smoothRightKnee = smoothLandmark(rightKneeHistory, rightKnee.x(), rightKnee.y())
+                
+                // 使用平滑後的坐標計算肩-髖-膝角度
+                val newRightAngle = calculateAngleFromCoordinates(
+                    smoothRightShoulder.first, smoothRightShoulder.second,
+                    smoothRightHip.first, smoothRightHip.second,
+                    smoothRightKnee.first, smoothRightKnee.second
+                )
+                rightAngle = newRightAngle
+                rightAngleValid = true
+                
+                // 更新右腳角度歷史
+                updateAngleHistory(rightAngleHistory, newRightAngle)
+            } else {
+                rightAngleValid = false
+                android.util.Log.d("PoseOverlayView", "右腿肩-髖-膝關鍵點不在螢幕上或無效")
+            }
+            
+            // 添加額外的驗證邏輯來防止誤判
+            validateAngles()
+            
+        } catch (e: Exception) {
+            android.util.Log.e("PoseOverlayView", "計算肩-髖-膝角度時發生錯誤: ${e.message}")
+            leftAngleValid = false
+            rightAngleValid = false
+        }
+    }
+    
+    /**
+     * 計算髖-膝-踝角度（用於左右跨步）
+     */
+    private fun calculateHipKneeAnkleAngles(landmarks: List<com.google.mediapipe.tasks.components.containers.NormalizedLandmark>) {
+        try {
+            // 獲取髖-膝-踝關鍵點索引
             val leftHipIndex = getCorrectLandmarkIndex(23)
             val leftKneeIndex = getCorrectLandmarkIndex(25)
             val leftAnkleIndex = getCorrectLandmarkIndex(27)
@@ -400,7 +524,7 @@ class PoseOverlayView @JvmOverloads constructor(
             val rightKneeIndex = getCorrectLandmarkIndex(26)
             val rightAnkleIndex = getCorrectLandmarkIndex(28)
             
-            // 左腿角度計算 - 髖-膝-踝角度
+            // 左腿髖-膝-踝角度計算
             val leftHip = landmarks[leftHipIndex]
             val leftKnee = landmarks[leftKneeIndex]
             val leftAnkle = landmarks[leftAnkleIndex]
@@ -433,10 +557,10 @@ class PoseOverlayView @JvmOverloads constructor(
                 updateAngleHistory(leftAngleHistory, newLeftAngle)
             } else {
                 leftAngleValid = false
-                android.util.Log.d("PoseOverlayView", "左腿關鍵點不在螢幕上或無效")
+                android.util.Log.d("PoseOverlayView", "左腿髖-膝-踝關鍵點不在螢幕上或無效")
             }
             
-            // 右腿角度計算 - 髖-膝-踝角度
+            // 右腿髖-膝-踝角度計算
             val rightHip = landmarks[rightHipIndex]
             val rightKnee = landmarks[rightKneeIndex]
             val rightAnkle = landmarks[rightAnkleIndex]
@@ -469,14 +593,14 @@ class PoseOverlayView @JvmOverloads constructor(
                 updateAngleHistory(rightAngleHistory, newRightAngle)
             } else {
                 rightAngleValid = false
-                android.util.Log.d("PoseOverlayView", "右腿關鍵點不在螢幕上或無效")
+                android.util.Log.d("PoseOverlayView", "右腿髖-膝-踝關鍵點不在螢幕上或無效")
             }
             
             // 添加額外的驗證邏輯來防止誤判
             validateAngles()
             
         } catch (e: Exception) {
-            android.util.Log.e("PoseOverlayView", "計算角度時發生錯誤: ${e.message}")
+            android.util.Log.e("PoseOverlayView", "計算髖-膝-踝角度時發生錯誤: ${e.message}")
             leftAngleValid = false
             rightAngleValid = false
         }
@@ -687,8 +811,12 @@ class PoseOverlayView @JvmOverloads constructor(
             
             // 繪製左腿角度
             if (leftAngleValid) {
-                // 根據角度範圍設定顏色
-                angleTextPaint.color = AngleCalculator.getAngleColor(leftAngle)
+                // 根據運動類型選擇正確的顏色函數
+                angleTextPaint.color = when (exerciseType) {
+                    "高抬腳(側面)" -> AngleCalculator.getHighKneeAngleColor(leftAngle)
+                    "左右跨步" -> AngleCalculator.getAngleColor(leftAngle)
+                    else -> Color.WHITE  // 未設置運動類型時使用白色
+                }
                 val angleText = "左腳: ${AngleCalculator.formatAngle(leftAngle)}°"
                 canvas.drawText(angleText, leftX, currentY, angleTextPaint)
                 currentY += 60f  // 下一個位置
@@ -700,8 +828,12 @@ class PoseOverlayView @JvmOverloads constructor(
             
             // 繪製右腿角度
             if (rightAngleValid) {
-                // 根據角度範圍設定顏色
-                angleTextPaint.color = AngleCalculator.getAngleColor(rightAngle)
+                // 根據運動類型選擇正確的顏色函數
+                angleTextPaint.color = when (exerciseType) {
+                    "高抬腳(側面)" -> AngleCalculator.getHighKneeAngleColor(rightAngle)
+                    "左右跨步" -> AngleCalculator.getAngleColor(rightAngle)
+                    else -> Color.WHITE  // 未設置運動類型時使用白色
+                }
                 val angleText = "右腳: ${AngleCalculator.formatAngle(rightAngle)}°"
                 canvas.drawText(angleText, leftX, currentY, angleTextPaint)
                 currentY += 60f
@@ -840,9 +972,11 @@ class PoseOverlayView @JvmOverloads constructor(
             rightAngleHistory.clear()
             
             // 清理關鍵點歷史
+            leftShoulderHistory.clear()
             leftHipHistory.clear()
             leftKneeHistory.clear()
             leftAnkleHistory.clear()
+            rightShoulderHistory.clear()
             rightHipHistory.clear()
             rightKneeHistory.clear()
             rightAnkleHistory.clear()

@@ -134,6 +134,21 @@ class AngleCalculator {
         fun isFailureRange(angle: Double): Boolean {
             return (angle >= 102.0 && angle < 108.0) || (angle > 132.0 && angle <= 138.0)
         }
+        
+        /**
+         * 根據角度範圍獲取對應的顏色 - 高抬腳角度範圍
+         */
+        fun getHighKneeAngleColor(angle: Double): Int {
+            return when {
+                // 成功範圍：72° ~ 108°
+                angle >= 72.0 && angle <= 108.0 -> 0xFF00FF00.toInt() // 綠色 - 成功範圍
+                // 失敗範圍：54° ~ 72° 和 108° ~ 126°
+                (angle >= 54.0 && angle < 72.0) || (angle > 108.0 && angle <= 126.0) -> 0xFF1055C9.toInt() // 藍色 - 失敗範圍
+                // 無效範圍：126° ~ 145°
+                angle >= 126.0 && angle <= 145.0 -> 0xFFFFA500.toInt() // 橙色 - 無效範圍
+                else -> 0xFFFFFFFF.toInt() // 白色 - 其他範圍
+            }
+        }
     }
 }
 

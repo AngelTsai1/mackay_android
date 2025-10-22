@@ -74,6 +74,9 @@ class PoseActivity : AppCompatActivity(), PoseLandmarkerHelper.LandmarkerListene
         statusText = findViewById(R.id.statusText)
         poseOverlayView = findViewById(R.id.poseOverlayView)
         backButton = findViewById(R.id.backButton)
+        
+        // 立即設置運動類型，確保在角度計算前就設置正確的運動類型
+        poseOverlayView.setExerciseType(exerciseType)
     }
     
     private fun setupClickListeners() {
@@ -233,9 +236,6 @@ class PoseActivity : AppCompatActivity(), PoseLandmarkerHelper.LandmarkerListene
                     RunningMode.LIVE_STREAM,
                     isMirrored = true  // 使用前置攝像頭，需要鏡像處理
                 )
-                
-                // 設置運動類型
-                poseOverlayView.setExerciseType(exerciseType)
             } else {
                 Log.d("PoseActivity", "没有检测到人体")
             }
